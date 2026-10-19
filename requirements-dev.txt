@@ -1,0 +1,5 @@
+# Test dependencies; install the project itself for runtime dependencies.
+pytest>=7.0
+build>=1.0
+setuptools>=64
+wheel>=0.38

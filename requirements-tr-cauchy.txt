@@ -1,0 +1,2 @@
+# Compatibility entry point; requirements.txt now defines the core dependencies.
+-r requirements.txt

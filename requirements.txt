@@ -1,0 +1,4 @@
+# Minimal runtime dependencies for the method registry and TR-Cauchy core.
+torch>=2.0
+numpy>=1.21
+scipy>=1.8

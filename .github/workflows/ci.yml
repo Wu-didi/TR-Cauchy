@@ -1,0 +1,77 @@
+name: Tests and distributions
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install core and development dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "torch>=2.0" --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install ".[dev]"
+          python -m pip check
+      - name: Run core and packaging tests
+        run: python -m pytest -q
+      - name: Run a short CPU training example
+        run: python -m examples.train_synthetic --steps 3
+      - name: Build source, wheel, and project ZIP distributions
+        run: |
+          python -m build
+          python scripts/build_paper_attachment.py
+      - name: Check the source distribution contains installation and release inputs
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import tarfile
+          archive, = Path("dist").glob("*.tar.gz")
+          with tarfile.open(archive) as source:
+              names = {name.split("/", 1)[1] for name in source.getnames() if "/" in name}
+          required = {
+              "LICENSE", "README.md", "pyproject.toml", "setup.py", "MANIFEST.in",
+              "requirements.txt", "requirements-dev.txt", "requirements-experiments.txt",
+              "examples/__init__.py", "examples/train_synthetic.py",
+              "scripts/build_paper_attachment.py", "tests/test_packaging.py",
+              "docs/USAGE.md", ".github/workflows/ci.yml",
+              "SOURCE_PROVENANCE.json", "VALIDATION.md",
+          }
+          missing = required - names
+          assert not missing, f"Missing sdist inputs: {sorted(missing)}"
+          PY
+      - name: Install and run the wheel outside the source checkout
+        shell: bash
+        run: |
+          python -m venv --system-site-packages "$RUNNER_TEMP/tr-cauchy-wheel-env"
+          "$RUNNER_TEMP/tr-cauchy-wheel-env/bin/python" -m pip install --no-deps --ignore-installed dist/*.whl
+          mkdir -p "$RUNNER_TEMP/tr-cauchy-wheel-run"
+          cd "$RUNNER_TEMP/tr-cauchy-wheel-run"
+          "$RUNNER_TEMP/tr-cauchy-wheel-env/bin/python" -c 'import sys, pathlib, methods, examples; assert pathlib.Path(methods.__file__).resolve().is_relative_to(pathlib.Path(sys.prefix)); assert pathlib.Path(examples.__file__).resolve().is_relative_to(pathlib.Path(sys.prefix))'
+          "$RUNNER_TEMP/tr-cauchy-wheel-env/bin/python" -m examples.train_synthetic --steps 3
+      - name: Install and run the unpacked source distribution
+        shell: bash
+        run: |
+          python -m venv --system-site-packages "$RUNNER_TEMP/tr-cauchy-sdist-env"
+          mkdir -p "$RUNNER_TEMP/tr-cauchy-sdist" "$RUNNER_TEMP/tr-cauchy-sdist-run"
+          tar -xzf dist/*.tar.gz -C "$RUNNER_TEMP/tr-cauchy-sdist"
+          for source_dir in "$RUNNER_TEMP/tr-cauchy-sdist"/*; do
+            "$RUNNER_TEMP/tr-cauchy-sdist-env/bin/python" -m pip install --no-deps --no-build-isolation --ignore-installed "$source_dir"
+          done
+          cd "$RUNNER_TEMP/tr-cauchy-sdist-run"
+          "$RUNNER_TEMP/tr-cauchy-sdist-env/bin/python" -c 'import sys, pathlib, methods, examples; assert pathlib.Path(methods.__file__).resolve().is_relative_to(pathlib.Path(sys.prefix)); assert pathlib.Path(examples.__file__).resolve().is_relative_to(pathlib.Path(sys.prefix))'
+          "$RUNNER_TEMP/tr-cauchy-sdist-env/bin/python" -m examples.train_synthetic --steps 3

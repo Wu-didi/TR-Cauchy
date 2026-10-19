@@ -1,0 +1,26 @@
+include LICENSE README.md PAPER_CODE_ATTACHMENT.md
+include .gitignore pyproject.toml setup.py
+include requirements*.txt
+include SOURCE_PROVENANCE.json VALIDATION.md
+include CONTRIBUTING.md
+include CHANGELOG.md THIRD_PARTY_NOTICES.md
+recursive-include methods *.py
+recursive-include experiments *.py README.md run.sh
+recursive-include examples *.py *.md
+recursive-include docs *.md
+recursive-include tests *.py
+recursive-include scripts *.py
+recursive-include .github *.yml *.yaml *.md
+global-exclude *.py[cod] .DS_Store
+global-exclude *.log *.stats *.npy *.npz *.pt *.pth *.ckpt
+prune .git
+prune .venv
+prune venv
+prune build
+prune dist
+prune .pytest_cache
+prune experiments/*/dataset
+prune experiments/*/datasets
+prune experiments/*/trainlogs
+prune experiments/*/outputs
+prune experiments/*/save
